@@ -20,7 +20,7 @@ caine/
 # 1. Instalar Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 ollama serve &          # noutro terminal
-ollama pull llama3.2    # ~2GB
+ollama pull llama3.2    # 2GB
 
 # 2. Dependências de áudio (Linux)
 sudo apt install espeak-ng portaudio19-dev python3-pyaudio
