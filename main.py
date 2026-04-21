@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 main.py — O Espetáculo começa aqui
-Caine: IA terminal com voz, memória e músicas
-Otimizado:
-  - Streaming de tokens em modo texto E modo voz
-  - TTS arranca em paralelo com o streaming (não espera pelo fim)
-  - Feedback de estado do microfone (a calibrar / a escutar / a processar)
-  - Indicador de backend STT ativo (Whisper / Google)
+Caine: IA terminal com voz, memória e recolha de dados de treino
+
+Comandos novos:
+  /bom       — marca a última resposta como bom exemplo de treino
+  /exportar  — exporta os dados para training_data.jsonl na pasta atual
+  /treino    — mostra quantos exemplos foram recolhidos
 """
 
 import sys
@@ -39,7 +39,6 @@ from rich.text    import Text
 
 console = Console()
 
-# ── Ícones de estado do microfone ─────────────────────────────────────────────
 _MIC_STATES = {
     "listening"   : ("[bold green]🎤[/bold green]", "A escutar..."),
     "processing"  : ("[bold yellow]⚙[/bold yellow]",  "A processar..."),
@@ -54,21 +53,13 @@ def _mic_label(state: str) -> str:
     return f"{icon} [dim]{label}[/dim]"
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  APLICAÇÃO
-# ══════════════════════════════════════════════════════════════════════════════
-
 class CaineApp:
     def __init__(self):
         self.memory = Memory()
         self.tts    = TTS()
-
-        # STT com callback de estado — atualiza variável para o loop de UI
         self._mic_state = "listening"
         self.stt = STT(on_state=self._on_mic_state)
-
         self.ai = CaineAI(self.memory)
-
         self.voice_mode  = False
         self.tts_enabled = self.tts.available
         self.running     = True
@@ -76,26 +67,23 @@ class CaineApp:
     def _on_mic_state(self, state: str):
         self._mic_state = state
 
-    # ── Boas-vindas ───────────────────────────────────────────────────────────
     def _welcome(self):
         nome    = self.memory.data.get("nome")
         sessoes = self.memory.data.get("num_sessoes", 0)
         factos  = len(self.memory.data.get("factos", []))
-
+        treino  = self.ai.training_count()
         performer = f"[bold magenta]{nome}[/bold magenta]" if nome else "novo performer"
-
-        # Aguarda detecção de Whisper (máx 2s) para mostrar backend correto
         self.stt._whisper_ready.wait(timeout=2.0)
         stt_backend = self.stt.backend
-
         info = (
             f"Bem-vindo ao espetáculo, {performer}!\n"
-            f"Sessão [bold]#{sessoes + 1}[/bold]  •  {factos} factos na memória\n"
+            f"Sessão [bold]#{sessoes + 1}[/bold]  •  {factos} factos na memória  •  "
+            f"[yellow]{treino} exemplos de treino[/yellow]\n"
             f"Modelo: [bold cyan]{self.ai.model}[/bold cyan]  │  "
             f"TTS: {'[green]✓[/green] ' + self.tts.method if self.tts_enabled else '[red]✗[/red]'}  │  "
             f"STT: {'[green]' + stt_backend + '[/green]' if self.stt.available else '[red]✗[/red]'}\n\n"
-            "[dim]/voz  /mudo  /memoria  /modelos  "
-            "/modelo <n>  /apagar  /limpar  /sair[/dim]"
+            "[dim]/voz  /mudo  /memoria  /modelos  /modelo <n>\n"
+            "/bom  /treino  /exportar  /apagar  /limpar  /sair[/dim]"
         )
         console.print(Panel(
             info,
@@ -104,7 +92,6 @@ class CaineApp:
         ))
         console.print()
 
-    # ── Comandos ──────────────────────────────────────────────────────────────
     def _handle_command(self, raw: str):
         parts = raw.strip().split(maxsplit=1)
         cmd   = parts[0].lower()
@@ -115,13 +102,35 @@ class CaineApp:
             console.print("[bold yellow]O show... por agora... termina. 👋[/bold yellow]")
             self.running = False
 
+        elif cmd == "/bom":
+            # ── Marca a última resposta como bom exemplo de treino ──
+            if self.ai.mark_good():
+                total = self.ai.training_count()
+                console.print(f"[green]✓ Guardado! Total de exemplos: {total}[/green]")
+                console.print("[dim]Quando tiveres ~100 exemplos, corre /exportar[/dim]")
+            else:
+                console.print("[yellow]Sem resposta para guardar ainda.[/yellow]")
+
+        elif cmd == "/treino":
+            total = self.ai.training_count()
+            console.print(f"[cyan]Exemplos de treino recolhidos: [bold]{total}[/bold][/cyan]")
+            if total < 50:
+                console.print(f"[dim]Recomendado: pelo menos 100. Faltam {max(0, 100-total)}.[/dim]")
+            elif total < 100:
+                console.print("[dim]Bom progresso! Continua a usar /bom nas boas respostas.[/dim]")
+            else:
+                console.print("[green]Tens dados suficientes para fine-tuning! Usa /exportar.[/green]")
+
+        elif cmd == "/exportar":
+            path = self.ai.export_training()
+            console.print(f"[green]✓ Ficheiro exportado:[/green] [bold]{path}[/bold]")
+            console.print("[dim]Carrega este ficheiro no Google Colab com Unsloth para treinar.[/dim]")
+
         elif cmd == "/voz":
             if self.stt.available:
                 self.voice_mode = not self.voice_mode
                 estado = "[green]ativado 🎤[/green]" if self.voice_mode else "[red]desativado[/red]"
                 console.print(f"[cyan]Modo voz {estado}[/cyan]")
-                if self.voice_mode:
-                    console.print(f"[dim]Backend STT: {self.stt.backend}[/dim]")
             else:
                 console.print("[red]Microfone não disponível.[/red]")
 
@@ -168,16 +177,12 @@ class CaineApp:
 
         else:
             console.print(f"[yellow]Comando desconhecido:[/yellow] {cmd}")
-            console.print("[dim]/voz /mudo /memoria /modelos /modelo /apagar /limpar /sair[/dim]")
+            console.print("[dim]/voz /mudo /memoria /modelos /modelo /bom /treino /exportar /apagar /limpar /sair[/dim]")
 
-    # ── Streaming com TTS paralelo ────────────────────────────────────────────
     def _stream_reply(self, user_input: str) -> str:
-        """Faz streaming dos tokens para o terminal e devolve a resposta completa."""
         console.print()
         console.print("[bold magenta]CAINE »[/bold magenta]")
-
         collected = []
-
         try:
             with Live(
                 Panel("", border_style="magenta", padding=(0, 1)),
@@ -192,17 +197,11 @@ class CaineApp:
                         padding=(0, 1),
                     ))
         except KeyboardInterrupt:
-            raise  # propaga para o run() guardar a sessão
-
+            raise
         console.print()
         return "".join(collected)
 
-    # ── Input por voz com feedback visual ─────────────────────────────────────
     def _listen_with_feedback(self) -> str | None:
-        """
-        Escuta o microfone mostrando estado em tempo real:
-          📡 A calibrar mic...  →  🎤 A escutar...  →  ⚙ A processar...
-        """
         result_holder = [None]
         done = threading.Event()
 
@@ -225,13 +224,11 @@ class CaineApp:
             console.print(f"[bold cyan]Tu 🎤 »[/bold cyan] [dim]{text}[/dim]")
         return text
 
-    # ── Loop principal ────────────────────────────────────────────────────────
     def run(self):
         self._welcome()
 
         while self.running:
             try:
-                # ── Input ──
                 if self.voice_mode:
                     user_input = self._listen_with_feedback()
                     if not user_input:
@@ -243,15 +240,15 @@ class CaineApp:
                 if not user_input:
                     continue
 
-                # ── Comandos ──
                 if user_input.startswith("/"):
                     self._handle_command(user_input)
                     console.print()
                     continue
 
-                # ── Resposta com streaming em ambos os modos ──
-                # Streaming puro; TTS só arranca depois do texto completo
                 reply = self._stream_reply(user_input)
+
+                # Dica após cada resposta
+                console.print("[dim]  (se gostaste desta resposta, escreve /bom)[/dim]")
 
                 if self.tts_enabled:
                     self.tts.speak(reply)
@@ -263,7 +260,6 @@ class CaineApp:
                 break
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     try:
         CaineApp().run()

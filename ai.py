@@ -1,6 +1,6 @@
 """
 ai.py — Cérebro do Caine: chat com Ollama + extração de memória
-Otimizado: streaming, extração lazy, fecho assíncrono
+Otimizado: streaming, extração lazy, fecho assíncrono, recolha de dados de treino
 """
 
 import json
@@ -10,7 +10,8 @@ from datetime import datetime
 
 import ollama
 
-from memory import Memory
+from memory  import Memory
+from trainer import Trainer
 
 
 EXTRACT_PROMPT = (
@@ -62,10 +63,11 @@ Nota: No Windows, a interface converterá automaticamente as keywords para 'cmd 
 
 
 class CaineAI:
-    def __init__(self, memory: Memory, model: str = "llama3.2"):
-        self.memory  = memory
-        self.model   = model
-        self.history = []
+    def __init__(self, memory: Memory, model: str = "caine-dev"):
+        self.memory   = memory
+        self.model    = model
+        self.history  = []
+        self.trainer  = Trainer()
         self._check_model()
 
     def _check_model(self):
@@ -77,13 +79,20 @@ class CaineAI:
                 "Inicia com:  ollama serve"
             )
         if self.model.split(":")[0] not in available:
-            if available:
-                self.model = available[0]
+            # Fallback: tenta caine-dev → qwen2.5-coder → primeiro disponível
+            fallbacks = ["caine-dev", "qwen2.5-coder", "llama3.2"]
+            for fb in fallbacks:
+                if fb.split(":")[0] in available:
+                    self.model = fb
+                    break
             else:
-                raise RuntimeError(
-                    f"Nenhum modelo instalado.\n"
-                    f"Corre:  ollama pull llama3.2"
-                )
+                if available:
+                    self.model = available[0]
+                else:
+                    raise RuntimeError(
+                        "Nenhum modelo instalado.\n"
+                        "Corre:  ollama pull qwen2.5-coder:7b"
+                    )
 
     def system_prompt(self) -> str:
         return (
@@ -95,7 +104,6 @@ class CaineAI:
     def chat_stream(self, user_input: str):
         """
         Generator que faz yield de tokens à medida que chegam do Ollama.
-        Muito mais rápido — o utilizador vê a resposta a surgir em tempo real.
         """
         self.memory.extract_simple(user_input)
         self.history.append({"role": "user", "content": user_input})
@@ -104,8 +112,8 @@ class CaineAI:
         stream = ollama.chat(
             model=self.model,
             messages=[{"role": "system", "content": self.system_prompt()}] + self.history,
-            options={"temperature": 0.9, "num_predict": 400},
-            stream=True,  # ← a mudança crítica
+            options={"temperature": 0.2, "num_predict": 2048},
+            stream=True,
         )
         for chunk in stream:
             token = chunk["message"]["content"]
@@ -122,6 +130,29 @@ class CaineAI:
     def chat(self, user_input: str) -> str:
         """Compatibilidade: versão não-streaming (modo voz)."""
         return "".join(self.chat_stream(user_input))
+
+    def mark_good(self):
+        """
+        Marca o último par pergunta/resposta como bom exemplo de treino.
+        Chama após uma resposta que gostaste: ai.mark_good()
+        Ou via comando /bom no terminal/GUI.
+        """
+        if len(self.history) < 2:
+            return False
+        # Pega nos últimos user + assistant
+        last_user      = next((m["content"] for m in reversed(self.history) if m["role"] == "user"),      None)
+        last_assistant = next((m["content"] for m in reversed(self.history) if m["role"] == "assistant"), None)
+        if last_user and last_assistant:
+            self.trainer.save_example(last_user, last_assistant)
+            return True
+        return False
+
+    def training_count(self) -> int:
+        return self.trainer.count()
+
+    def export_training(self) -> str:
+        path = self.trainer.export()
+        return str(path)
 
     def _parse_json(self, text: str) -> dict | None:
         text = re.sub(r"```json|```", "", text).strip()
@@ -154,8 +185,7 @@ class CaineAI:
 
     def save_session(self):
         """
-        Chamado no fecho — extrai memória em background e guarda.
-        Não bloqueia o processo principal.
+        Chamado no fecho — extrai memória e guarda sessão completa se marcada.
         """
         if not self.history:
             self.memory.update_session()
@@ -180,7 +210,6 @@ class CaineAI:
             except Exception:
                 self.memory.update_session()
 
-        # Corre em thread com join de 5s — guarda sem bloquear indefinidamente
         t = threading.Thread(target=_do_save, daemon=False)
         t.start()
         t.join(timeout=5.0)
