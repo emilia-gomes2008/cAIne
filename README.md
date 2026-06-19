@@ -1,47 +1,63 @@
 # 🎭 CAINE — The Amazing Digital Circus AI
 
-IA terminal com personalidade do Caine, voz, memória persistente e músicas.
+Terminal and desktop AI with Caine's personality, spoken replies (TTS), persistent memory, and fine-tuning tools.
 
-## Estrutura
+## Structure
 
 ```
-caine/
-├── main.py        ← entrada principal (corre isto)
-├── ai.py          ← cérebro: chat com Ollama + extração de memória
-├── memory.py      ← memória persistente em ~/.caine/memoria.json
-├── tts.py         ← síntese de voz (espeak-ng / say / pyttsx3)
-├── stt.py         ← reconhecimento de voz (sem spam ALSA)
+cAIne/
+├── app/
+│   ├── main.py         ← terminal entry point (run this for the CLI)
+│   └── gui.py           ← desktop entry point (PyQt6 GUI)
+├── core/
+│   ├── ai.py             ← brain: chat with Ollama + memory extraction
+│   ├── memory.py         ← persistent memory in ~/.caine/memory.json
+│   └── trainer.py        ← training data collection (JSONL)
+├── audio/
+│   └── tts.py             ← speech synthesis (espeak-ng / say / pyttsx3)
+├── data/
+│   ├── import_datasets.py        ← imports Hugging Face datasets
+│   └── prepare_finetune_data.py  ← builds finetune_data.jsonl
+├── assets/
+│   └── caine_avatar.png   ← GUI avatar
+├── model/
+│   ├── Modelfile           ← Ollama model definition
+│   └── caine_model.gguf    ← fine-tuned weights (not committed, see .gitignore)
 └── requirements.txt
 ```
 
-## Instalação
+## Installation
 
 ```bash
-# 1. Instalar Ollama
+# 1. Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
-ollama serve &          # noutro terminal
-ollama pull llama3.2    # 2GB
+ollama serve &          # in another terminal
+ollama pull llama3.2     # 2GB
 
-# 2. Dependências de áudio (Linux)
-sudo apt install espeak-ng portaudio19-dev python3-pyaudio
+# 2. Audio dependencies (Linux, for spoken replies)
+sudo apt install espeak-ng
 
-# 3. Pacotes Python
+# 3. Python packages
 pip install -r requirements.txt
 
-# 4. Arrancar
-python main.py
+# 4. Run
+python app/main.py     # terminal
+python app/gui.py      # desktop GUI
 ```
 
-## Comandos
+## Commands
 
-| Comando | Ação |
+| Command | Action |
 |---|---|
-| `/voz` | Liga/desliga microfone |
-| `/mudo` | Liga/desliga TTS |
-| `/memoria` | Mostra o que o Caine sabe sobre ti |
-| `/apagar` | Apaga a memória |
-| `/modelos` | Lista modelos Ollama instalados |
-| `/modelo llama3.3` | Troca de modelo |
-| `/limpar` | Limpa histórico da sessão |
-| `/sair` | Guarda e sai |
-"
+| `/mute` | Toggles TTS |
+| `/memory` | Shows what Caine knows about you |
+| `/forget` | Clears memory |
+| `/models` | Lists installed Ollama models |
+| `/model llama3.3` | Switches model |
+| `/clear` | Clears the session history |
+| `/good` | Marks the last reply as a good training example |
+| `/train` | Shows how many training examples have been collected |
+| `/export` | Exports the data to training_data.jsonl |
+| `/quit` | Saves and exits |
+
+CAINE always replies in whatever language you write to it in — no fixed language is hardcoded into the persona.

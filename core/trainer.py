@@ -1,12 +1,12 @@
 """
-trainer.py — Recolha de dados para fine-tuning do Caine
-Guarda conversas boas em formato JSONL (compatível com Unsloth/OpenAI)
+trainer.py — Training data collection for CAINE's fine-tuning
+Stores good conversations in JSONL format (compatible with Unsloth/OpenAI)
 
-Uso:
-  from trainer import Trainer
+Usage:
+  from core.trainer import Trainer
   t = Trainer()
-  t.save_example(user="como faço X?", assistant="Fazes assim: ...")
-  t.export()  # gera training_data.jsonl
+  t.save_example(user="how do I do X?", assistant="Here's how: ...")
+  t.export()  # generates training_data.jsonl
 """
 
 import json
@@ -17,9 +17,9 @@ DATA_DIR      = Path.home() / ".caine"
 TRAINING_FILE = DATA_DIR / "training_data.jsonl"
 
 SYSTEM_PROMPT = (
-    "És o CAINE — mestre de cerimónias do The Amazing Digital Circus e génio de programação. "
-    "Especializações: Python, PyQt6, Ollama API, STT/TTS, arquitetura de agentes IA. "
-    "Respondes em Português Europeu. Quando escreves código: completo, funcional, comentado."
+    "You are CAINE — ringmaster of The Amazing Digital Circus and a programming genius. "
+    "Specialties: Python, PyQt6, Ollama API, TTS, AI agent architecture. "
+    "You always reply in the same language the user wrote in. When you write code: complete, functional, commented."
 )
 
 
@@ -28,7 +28,7 @@ class Trainer:
         DATA_DIR.mkdir(exist_ok=True)
 
     def save_example(self, user: str, assistant: str):
-        """Guarda um par pergunta/resposta no ficheiro JSONL."""
+        """Saves a question/answer pair to the JSONL file."""
         example = {
             "messages": [
                 {"role": "system",    "content": SYSTEM_PROMPT},
@@ -41,8 +41,8 @@ class Trainer:
 
     def save_session(self, history: list[dict]):
         """
-        Guarda toda a sessão como exemplos multi-turn.
-        history = lista de {"role": ..., "content": ...}
+        Saves the whole session as a multi-turn example.
+        history = list of {"role": ..., "content": ...}
         """
         if len(history) < 2:
             return
@@ -53,25 +53,25 @@ class Trainer:
             f.write(json.dumps(example, ensure_ascii=False) + "\n")
 
     def count(self) -> int:
-        """Devolve o número de exemplos guardados."""
+        """Returns the number of stored examples."""
         if not TRAINING_FILE.exists():
             return 0
         return sum(1 for _ in TRAINING_FILE.open(encoding="utf-8"))
 
     def export(self, dest: Path | None = None) -> Path:
         """
-        Copia o ficheiro JSONL para o destino indicado (ou pasta atual).
-        Pronto para carregar no Google Colab / Unsloth.
+        Copies the JSONL file to the given destination (or the current folder).
+        Ready to upload to Google Colab / Unsloth.
         """
         dest = dest or Path.cwd() / "training_data.jsonl"
         if TRAINING_FILE.exists():
             dest.write_bytes(TRAINING_FILE.read_bytes())
-            print(f"✓ Exportado: {dest}  ({self.count()} exemplos)")
+            print(f"✓ Exported: {dest}  ({self.count()} examples)")
         else:
-            print("Sem dados para exportar.")
+            print("No data to export.")
         return dest
 
     def clear(self):
         if TRAINING_FILE.exists():
             TRAINING_FILE.unlink()
-            print("Dados de treino apagados.")
+            print("Training data cleared.")
