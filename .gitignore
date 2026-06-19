@@ -1,2 +1,6 @@
 /__pycache__/
-/.venv/ 
+/.venv/
+**/__pycache__/
+**/__init__.py
+/model/*.gguf
+/data/*.jsonl
