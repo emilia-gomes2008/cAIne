@@ -16,6 +16,11 @@ class Memory:
     def __init__(self):
         DATA_DIR.mkdir(exist_ok=True)
         self.data = self._load()
+        if not MEMORY_FILE.exists():
+            # Write it out right away, instead of waiting for the first fact/session
+            # to be saved — so ~/.caine/memory.json always exists once CAINE starts,
+            # even if this turns out to be a very short, fact-free session.
+            self.save()
 
     def _load(self) -> dict:
         if MEMORY_FILE.exists():
@@ -71,9 +76,15 @@ class Memory:
     def extract_simple(self, text: str):
         """Quick extraction without calling the model."""
         triggers = [
+            # English
             "my name is", "i'm a", "i am a", "i'm the", "i am the",
             "i like", "i love", "i hate", "i work", "i live in",
-            "i have", "years old", "profession", "hobby"
+            "i have", "years old", "profession", "hobby",
+            # Portuguese (CAINE replies in whatever language is prompted, so this
+            # quick extractor needs to recognize facts shared in that language too)
+            "chamo-me", "o meu nome é", "sou o", "sou a",
+            "gosto de", "adoro", "odeio", "trabalho", "vivo em",
+            "tenho", "anos", "profissão", "hobby",
         ]
         t = text.lower()
         if any(kw in t for kw in triggers):

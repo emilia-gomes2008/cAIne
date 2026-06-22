@@ -8,7 +8,7 @@ First message can take a bit, optimization needs some improvement yet.
 ```
 cAIne/
 ├── app/
-│   ├── main.py         ← terminal entry point (run this for the CLI)
+│   ├── terminal.only.py         ← terminal entry point (run this for the CLI)
 │   └── gui.py           ← desktop entry point (PyQt6 GUI)
 ├── core/
 │   ├── ai.py             ← brain: chat with Ollama + memory extraction
@@ -42,7 +42,7 @@ sudo apt install espeak-ng
 pip install -r requirements.txt
 
 # 4. Run
-python app/main.py     # terminal
+python app/terminal-only.py     # terminal
 python app/gui.py      # desktop GUI
 ```
 

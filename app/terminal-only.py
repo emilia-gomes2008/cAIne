@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-main.py — The Show starts here
+terminal-only.py — The Show starts here
 CAINE: terminal AI with memory and training data collection
 
 Commands:

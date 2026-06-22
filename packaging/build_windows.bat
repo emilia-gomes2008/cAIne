@@ -14,4 +14,4 @@ if errorlevel 1 exit /b 1
 echo.
 echo Done: dist\CAINE.exe
 echo Ollama must still be installed and running separately on Windows (or
-echo reachable over the network) — this .exe only bundles the Python app.
+echo reachable over the network). This .exe only bundles the Python app.

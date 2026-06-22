@@ -12,5 +12,5 @@ pyinstaller --name CAINE --onefile --windowed --noconfirm \
 
 echo
 echo "Done: dist/CAINE"
-echo "Ollama must still be installed and running separately — this binary"
+echo "Ollama must still be installed and running separately. This binary"
 echo "only bundles the Python app, not Ollama or the model weights."

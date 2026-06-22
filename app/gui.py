@@ -19,7 +19,8 @@ else:
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QLineEdit, QScrollArea, QFrame, QMessageBox
+    QLabel, QPushButton, QLineEdit, QScrollArea, QFrame, QMessageBox,
+    QStackedWidget
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QPixmap, QPainter, QPainterPath, QFont
@@ -121,6 +122,7 @@ class CaineGUI(QMainWindow):
     stream_token = pyqtSignal(str)
     stream_finished = pyqtSignal()
     confirm_request = pyqtSignal(dict, object)
+    warm_up_done = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -133,7 +135,7 @@ class CaineGUI(QMainWindow):
         self._stream_text = ""
         self._last_user_input = ""
 
-        self.setWindowTitle("CAINE — The Amazing Digital Circus OS")
+        self.setWindowTitle("cAIne")
         self.resize(1000, 800)
         self.init_ui()
         self.apply_styles()
@@ -143,6 +145,18 @@ class CaineGUI(QMainWindow):
         self.stream_started.connect(self._start_stream_bubble)
         self.stream_token.connect(self._append_stream_token)
         self.stream_finished.connect(self._finish_stream)
+        self.warm_up_done.connect(self._on_warm_up_done)
+        threading.Thread(target=self._wait_for_warm_up, daemon=True).start()
+
+    def _wait_for_warm_up(self):
+        self.ai.ready.wait()
+        self.warm_up_done.emit()
+
+    def _on_warm_up_done(self):
+        self.content_stack.setCurrentIndex(1)
+        self.input_field.setEnabled(True)
+        self.input_field.setPlaceholderText("Talk to CAINE, performer...")
+        self.input_field.setFocus()
 
     def init_ui(self):
         central = QWidget()
@@ -222,14 +236,29 @@ class CaineGUI(QMainWindow):
         self.chat_layout = QVBoxLayout(self.container)
         self.chat_layout.addStretch()
         self.scroll.setWidget(self.container)
-        r_layout.addWidget(self.scroll)
+
+        loading_widget = QWidget()
+        loading_widget.setObjectName("loading-screen")
+        loading_layout = QVBoxLayout(loading_widget)
+        loading_lbl = QLabel("🎪 CAINE is warming up for the show...")
+        loading_lbl.setObjectName("loading-label")
+        loading_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        loading_layout.addStretch()
+        loading_layout.addWidget(loading_lbl)
+        loading_layout.addStretch()
+
+        self.content_stack = QStackedWidget()
+        self.content_stack.addWidget(loading_widget)  # index 0: loading
+        self.content_stack.addWidget(self.scroll)      # index 1: chat
+        r_layout.addWidget(self.content_stack)
 
         # Input
         input_box = QFrame()
         input_box.setObjectName("input-box")
         i_layout = QHBoxLayout(input_box)
         self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText("Talk to CAINE, performer...")
+        self.input_field.setPlaceholderText("CAINE is warming up...")
+        self.input_field.setEnabled(False)
         self.input_field.returnPressed.connect(self.send_message)
         i_layout.addWidget(self.input_field)
         r_layout.addWidget(input_box)
@@ -282,6 +311,12 @@ class CaineGUI(QMainWindow):
                 margin: 10px 20px;
                 font-weight: bold;
                 text-align: center;
+            }}
+            #loading-label {{
+                color: {TADC_CREAM};
+                font-size: 18px;
+                font-weight: bold;
+                font-style: italic;
             }}
             #input-box {{ background: transparent; margin-top: 10px; }}
             QLineEdit {{

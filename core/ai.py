@@ -134,23 +134,35 @@ class CaineAI:
         self.trainer    = Trainer()
         self.confirm    = confirm or self._console_confirm
         self._extracting = threading.Event()
+        self.ready        = threading.Event()
         self._check_model()
         threading.Thread(target=self._warm_up, daemon=True).start()
 
     def _warm_up(self):
         """
-        Loads the model into memory in the background, right when the app starts.
-        Without this, the cost of loading a multi-GB model is paid on the user's
-        first real message instead of while they're still reading the welcome screen.
+        Loads the model into memory AND pre-processes the system prompt, in the
+        background, right when the app starts. Ollama caches the KV state for an
+        unchanged prefix across turns of the same growing conversation — turn 2+
+        only pays for the new tokens, not the whole prompt again. But that cache
+        is empty on a cold start, so without this, the performer's first real
+        message pays the full system-prompt processing cost (seconds to over a
+        minute on slow hardware) instead of it happening while they're still
+        reading the welcome screen.
+
+        Sets self.ready when done (or on failure) so a UI can show a loading
+        screen until the model has actually finished warming up.
         """
         try:
             ollama.chat(
                 model=self.model,
-                messages=[{"role": "user", "content": "hi"}],
+                messages=[{"role": "system", "content": self.system_prompt()},
+                          {"role": "user", "content": "hi"}],
                 options={"num_predict": 1},
             )
         except Exception:
             pass
+        finally:
+            self.ready.set()
 
     def _console_confirm(self, action: dict) -> bool:
         """Default confirmation (terminal): asks yes/no before running actions that change files."""
