@@ -9,8 +9,13 @@ import json
 import html
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_ROOT))
+if getattr(sys, "frozen", False):
+    # Running as a PyInstaller binary: source files live in a temp bundle dir
+    # (onefile) or next to the executable (onedir), not under app/.. like in dev.
+    _ROOT = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+else:
+    _ROOT = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(_ROOT))
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,

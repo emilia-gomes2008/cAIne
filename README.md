@@ -61,3 +61,19 @@ python app/gui.py      # desktop GUI
 | `/quit` | Saves and exits |
 
 CAINE always replies in whatever language you write to it in — no fixed language is hardcoded into the persona.
+
+## Standalone binary (no Python install needed)
+
+Build a single-file executable of the GUI with PyInstaller. **You must build on each target OS** — PyInstaller does not cross-compile, so a Windows `.exe` has to be built on a Windows machine and a Linux binary on Linux.
+
+```bash
+# Linux — produces dist/CAINE
+./packaging/build_linux.sh
+```
+
+```bat
+:: Windows — produces dist\CAINE.exe
+packaging\build_windows.bat
+```
+
+The binary only bundles the Python app (PyQt6, etc.) — it does **not** include Ollama or the model weights. Ollama still has to be installed and running (locally, or reachable over the network) wherever you run the binary; `ollama pull`/`ollama create caine-dev` happen the same way as in a normal install.
