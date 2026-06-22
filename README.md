@@ -1,7 +1,6 @@
-# 🎭 CAINE — The Amazing Digital Circus AI
+# 🎭 CAINE - The Amazing Digital Circus AI
 
 Terminal and desktop AI with Caine's personality, spoken replies (TTS), persistent memory, and fine-tuning tools.
-First message can take a bit, optimization needs some improvement yet.
 
 ## Structure
 
